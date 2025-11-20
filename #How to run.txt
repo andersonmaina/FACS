@@ -1,0 +1,26 @@
+Clone code folder from drive(model & api only, no UI(install later)
+
+Open terminal and run 'pip install -r requirements.txt'
+
+Execute each python file one by one eg. run in terminal: 'py feature_extractor.py'
+
+You might want to check the code in each first
+
+Ignore the quotes in commands
+
+
+
+
+
+#UI will be available after the UI & API design phase
+
+UI Contains many node dependencies so only the source folders with user defined code will be uploaded in drive
+
+Install node.js
+
+Run in terminal
+
+npx create-react-app facs
+cd facs
+
+Then replace the src files i.e App.js,index.js,index.html, index.css
