@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.decomposition import PCA
 
-normal_feats = np.load("features/normal_thorax_features.npy")
+normal_feats = np.load("features/CRL/normal_maxilla_features.npy")
 
 # PCA
 pca = PCA(n_components=2)
