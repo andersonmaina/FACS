@@ -17,14 +17,14 @@ cat = 'NT' #CRL
 feature = 'nasal_bone'
 img_paths = os.listdir(f"data/{cat}/{feature}_annotations")
 
-# Load pretrained ResNet-50 model and remove the classifier
+#load pretrained Resnet-50 model and remove the classifier
 
-weights = ResNet50_Weights.DEFAULT  # or IMAGENET1K_V1
+weights = ResNet50_Weights.DEFAULT  
 resnet = resnet50(weights=weights)
 resnet.fc = nn.Identity()
 resnet.eval()
 
-# Image transform for ResNet input
+#transform for Resnet input
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
