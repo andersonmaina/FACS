@@ -5,12 +5,17 @@ import io
 import base64
 import traceback
 import logging
+import os
 
 from model import predict
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging - reduce verbosity for Railway
+log_level = logging.WARNING if os.getenv('RAILWAY_ENVIRONMENT') else logging.DEBUG
+logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
+
+# Reduce werkzeug logging
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 app = Flask(__name__)
 
@@ -35,29 +40,21 @@ def process_annotation():
     Process annotation endpoint - handles both PC (JSON) and Telegram (form-data) sources
     """
     try:
-        logger.info(f"Request received - Content-Type: {request.content_type}")
-        
         # Determine source
         if request.content_type and request.content_type.startswith('multipart/form-data'):
             source = request.form.get('source', 'telegram')
-            logger.info(f"Form data source: {source}")
         else:
             data = request.get_json(silent=True)
             if data is None:
-                logger.error("No JSON data provided")
                 return jsonify({
                     "error": "No JSON data provided",
                     "details": "Request must be JSON or form-data"
                 }), 400
             source = data.get('source', 'pc')
-            logger.info(f"JSON source: {source}")
 
         if source == "pc":
             # Handle PC source (JSON with base64 image)
-            logger.info("Processing PC source request")
-            
             if data is None:
-                logger.error("Data is None for PC source")
                 return jsonify({
                     "error": "No JSON data provided",
                     "details": "PC source requires JSON payload"
@@ -79,7 +76,6 @@ def process_annotation():
                         ('view', view)
                     ] if not value
                 ]
-                logger.error(f"Missing required fields: {missing_fields}")
                 return jsonify({
                     "error": "Missing required fields",
                     "missing_fields": missing_fields
@@ -94,7 +90,6 @@ def process_annotation():
                 
                 img_bytes = base64.b64decode(encoded)
                 img = Image.open(io.BytesIO(img_bytes))
-                logger.info(f"Image decoded successfully: {img.size}")
                 
             except Exception as e:
                 logger.error(f"Failed to decode image: {str(e)}")
@@ -111,7 +106,6 @@ def process_annotation():
                     bbox['x'] + bbox['width'],
                     bbox['y'] + bbox['height']
                 ))
-                logger.info(f"Image cropped: {cropped.size}")
                 
             except Exception as e:
                 logger.error(f"Failed to crop image: {str(e)}")
@@ -120,17 +114,12 @@ def process_annotation():
                     "details": str(e)
                 }), 400
 
-            logger.info(f"Parameters:[Category-{category}, View-{view}, Annotations-{bbox}]")
-            logger.info("Processing image...")
-            
             try:
                 # Run prediction
                 error = predict(cropped, view, category)
                 label = get_label(error)
                 confidence = 100 - (100 * float(error))
                 diagnosis = build_diagnosis(error, confidence)
-                
-                logger.info(f"Prediction successful: Error-{error}, Confidence-{confidence}")
                 
             except Exception as e:
                 logger.error(f"Prediction failed: {str(e)}")
@@ -153,16 +142,12 @@ def process_annotation():
                 processed_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
                 processed_data_url = f"data:image/png;base64,{processed_b64}"
                 
-                logger.info(f"Image processed and encoded successfully")
-                
             except Exception as e:
                 logger.error(f"Failed to encode image: {str(e)}")
                 return jsonify({
                     "error": "Failed to encode result image",
                     "details": str(e)
                 }), 500
-            
-            logger.info(f"Results: Error-{error}, Comment-{label}, Confidence-{confidence}")
             
             return jsonify({
                 "success": True,
@@ -179,22 +164,18 @@ def process_annotation():
 
         elif source == "telegram":
             # Handle Telegram source (form-data with file upload)
-            logger.info("Processing Telegram source request")
-            
             category = request.form.get('category')
             view = request.form.get('view')
             source_field = request.form.get('source')
             image_file = request.files.get('image')
             
             if not image_file:
-                logger.error("No image file provided")
                 return jsonify({
                     "error": "No image file provided",
                     "details": "Form must include 'image' file"
                 }), 400
                 
             if not category or not view:
-                logger.error(f"Missing category or view: category={category}, view={view}")
                 return jsonify({
                     "error": "Missing required fields",
                     "details": "category and view are required"
@@ -205,8 +186,6 @@ def process_annotation():
                 
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
-                
-                logger.info(f"Image loaded successfully: {img.size}")
                     
             except Exception as e:
                 logger.error(f"Invalid image file: {str(e)}")
@@ -215,16 +194,11 @@ def process_annotation():
                     "details": str(e)
                 }), 400
 
-            logger.info(f"Parameters:[Category-{category}, View-{view}, Image size-{img.size}]")
-            logger.info("Processing image...")
-            
             try:
                 error = predict(img, view, category)
                 label = get_label(error)
                 confidence = 100 - (100 * float(error))
                 diagnosis = build_diagnosis(error, confidence)
-                
-                logger.info(f"Prediction successful: Error-{error}, Confidence-{confidence}")
                 
             except Exception as e:
                 logger.error(f"Prediction failed: {str(e)}")
@@ -239,8 +213,6 @@ def process_annotation():
                 img.save(buffered, format="PNG")
                 processed_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
                 processed_data_url = f"data:image/png;base64,{processed_b64}"
-                
-                logger.info("Image encoded successfully")
                 
             except Exception as e:
                 logger.error(f"Failed to encode image: {str(e)}")
@@ -261,13 +233,10 @@ def process_annotation():
                 "diagnosis": diagnosis,
                 "source": "telegram"
             }
-
-            logger.info(f"Results: Error-{error}, Comment-{label}, Confidence-{confidence}")
             
             return jsonify(response_data), 200
             
         else:
-            logger.error(f"Unsupported source: {source}")
             return jsonify({
                 "error": "Unsupported source",
                 "details": f"Source must be 'pc' or 'telegram', got '{source}'"
@@ -337,4 +306,4 @@ def internal_error(error):
     }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
