@@ -34,11 +34,21 @@ CORS(app, resources={
 threshold = 0.02
 diagnosis = ''
 
+@app.before_request
+def handle_preflight():
+    """Handle CORS preflight requests"""
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
 @app.route('/api/process-annotation', methods=['POST', 'OPTIONS'])
 def process_annotation():
     """
     Process annotation endpoint - handles both PC (JSON) and Telegram (form-data) sources
     """
+    # Handle preflight
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    
     try:
         # Determine source
         if request.content_type and request.content_type.startswith('multipart/form-data'):
@@ -251,9 +261,12 @@ def process_annotation():
             "type": type(e).__name__
         }), 500
 
-@app.route('/api/health', methods=['GET'])
+@app.route('/api/health', methods=['GET', 'OPTIONS'])
 def health_check():
     """Health check endpoint"""
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    
     return jsonify({
         "status": "healthy",
         "service": "FACS API"
